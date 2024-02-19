@@ -2,7 +2,16 @@ import os
 import shutil
 import time
 import argparse
+import hashlib
 from datetime import datetime
+
+def calculate_md5(file_path):
+    """Calculate MD5 checksum of a file."""
+    hash_md5 = hashlib.md5()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
 
 def sync_folders(source_path, replica_path, log_file, interval_seconds):
     while True:
@@ -11,11 +20,12 @@ def sync_folders(source_path, replica_path, log_file, interval_seconds):
             sync_result = sync(source_path, replica_path)
 
             # Log to console
-            print(f"[{datetime.now()}] {sync_result}")
+            if sync_result != "":
+                print(f"[{datetime.now()}] {sync_result}")
 
-            # Log to file
-            with open(log_file, 'a') as log:
-                log.write(f"[{datetime.now()}] {sync_result}\n")
+                # Log to file
+                with open(log_file, 'a') as log:
+                    log.write(f"[{datetime.now()}] {sync_result}\n")
 
             # Wait for the specified interval
             time.sleep(interval_seconds)
@@ -53,9 +63,31 @@ def sync(source_path, replica_path):
             source_file = os.path.join(root, file_name)
             replica_file = os.path.join(replica_root, file_name)
 
-            if not os.path.exists(replica_file) or os.path.getmtime(source_file) > os.path.getmtime(replica_file):
+            # Check if the replica file exists
+            if os.path.exists(replica_file):
+                # Compare MD5 checksums
+                if calculate_md5(source_file) != calculate_md5(replica_file):
+                    # Copy the file from source to replica
+                    shutil.copy2(source_file, replica_file)
+                    sync_result += f"Copied file: {replica_file}. "
+            else:
+                # File doesn't exist in replica, copy it
                 shutil.copy2(source_file, replica_file)
                 sync_result += f"Copied file: {replica_file}. "
+
+    # Remove any files in the replica folder that do not exist in the source folder
+    for root, dirs, files in os.walk(replica_path):
+        relative_path = os.path.relpath(root, replica_path)
+        source_root = os.path.join(source_path, relative_path)
+
+        for file_name in files:
+            replica_file = os.path.join(root, file_name)
+            source_file = os.path.join(source_root, file_name)
+
+            if not os.path.exists(source_file):
+                # File doesn't exist in source, delete it from replica
+                os.remove(replica_file)
+                sync_result += f"Deleted file: {replica_file}. "
 
     return sync_result.strip()
 
