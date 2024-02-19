@@ -21,7 +21,7 @@ This program synchronizes two folders - a source folder and a replica folder - t
 `interval_seconds`: Synchronization interval in seconds.
 
 ### Example 
-`python synchronize.py ./src_folder ./replica_folder ./logfile.txt 10`
+`python3 synchronize.py ./src_folder ./replica_folder ./logfile.txt 10`
 
 ### Docker 
 Besides running the program locally, you can also run it in a docker container. The docker can be started 
